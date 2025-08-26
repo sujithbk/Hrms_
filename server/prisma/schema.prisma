@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  role_name   String   @unique
+  description String?
+  users       User[]
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String?   // nullable
+  email        String   @unique
+  password_hash String
+  role_id      Int?
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  role Role? @relation(fields: [role_id], references: [id])
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  email     String
+  otp       String
+  expiresAt DateTime
+}
