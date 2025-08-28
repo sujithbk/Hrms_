@@ -4,6 +4,7 @@ const prisma = require('../config/prisma');
 const JWT = require('jsonwebtoken')
 const transporter = require('../config/mailer');
 const { generateOtp } = require('../utils/otp');
+const { getDayBounds, getCurrentSessionStart, calculateTodayRuntime } = require('../utils/timeUtils')
 require('dotenv').config();
 
 
@@ -686,4 +687,395 @@ exports.getAllUsers = async (req, res) => {
     });
   }
 };
+
+
+exports.roleCreation = async(req,res)=>{
+
+  try {
+     
+    if(!req.user){
+      res.status(404).json({
+        message:"Authentication required",
+        success: false
+      })
+    }
+    
+    const {role_name ,description} = req.body
+
+    if(!role_name || !description){
+      res.status(404).json({
+        message:"Fill the inputfield properly",
+        success: false
+      })
+    }
+
+    const alreadyrole = await prisma.role.findUnique({
+      where:{
+        role_name
+      }
+    })
+
+    if(alreadyrole == role_name){
+      res.status(404).json({
+        message:"This role is already in our db",
+        successa:false
+      })
+    }
+
+    const createRole = await prisma.role.create({
+        data:{role_name ,description}
+        
+    })
+
+    res.status(201).json({
+      message:"Role created sucessfully",
+      success:true,
+      role:{
+        role_name,
+        description
+      }
+    })
+    
+
+    
+  } catch (error) {
+    console.error('Failed to create a role',error),
+    res.status(400).json({
+      message:"failed to create a role",
+      success:false
+    })
+  }
+}
+
+
+
+
+
+
+//  Check-In
+exports.checkin = async (req, res) => {
+  try {
+      console.log("req.user object in checkin:", req.user);
+    const userId = req.user?.id; // Get from JWT token
+  
+
+console.log("userId:", userId);
+
+    
+    if (!userId) {
+      console.log(userId);
+      
+      return res.status(400).json({ success: false, message: "User ID is required" });
+      
+       
+    }
+
+    // Check if user is already checked in
+    const currentSessionStart = await getCurrentSessionStart(userId);
+    
+    if (currentSessionStart) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Already checked in",
+        currentSessionStart: currentSessionStart
+      });
+    }
+
+    // Create check-in record
+    const checkinRecord = await prisma.checkInOut.create({
+      data: {
+        userId: userId,
+        timestamp: new Date(),
+        checkType: 1, // Check-in
+        difference: null // No difference for check-in records
+      }
+    });
+
+    // Get current total runtime for today
+    const todayRuntime = await calculateTodayRuntime(userId);
+
+    res.status(201).json({ 
+      success: true, 
+      message: "Check-in successful", 
+      data: {
+        record: checkinRecord,
+        isCheckedIn: true,
+        todayRuntime: todayRuntime,
+        currentSessionStart: checkinRecord.timestamp
+      }
+    });
+
+  } catch (error) {
+    console.error("Check-in error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+//  Check-Out
+exports.checkout = async (req, res) => {
+  try {
+    const userId = req.user.id; // Get from JWT token
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    // Find current session start time
+    const currentSessionStart = await getCurrentSessionStart(userId);
+    
+    if (!currentSessionStart) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "No active check-in found for today" 
+      });
+    }
+
+    // Calculate session time in minutes
+    const checkoutTime = new Date();
+    const sessionMinutes = Math.floor((checkoutTime - new Date(currentSessionStart)) / (1000 * 60));
+
+    // Create checkout record with time difference
+    const checkoutRecord = await prisma.checkInOut.create({
+      data: {
+        userId: userId,
+        timestamp: checkoutTime,
+        checkType: 2, // Check-out
+        difference: sessionMinutes
+      }
+    });
+
+    // Get updated total runtime for today
+    const todayRuntime = await calculateTodayRuntime(userId);
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Check-out successful", 
+      data: {
+        record: checkoutRecord,
+        isCheckedIn: false,
+        sessionMinutes: sessionMinutes,
+        todayRuntime: todayRuntime
+      }
+    });
+
+  } catch (error) {
+    console.error("Check-out error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+//  Status - Returns current status and runtime info
+exports.status = async (req, res) => {
+  try {
+    const userId = req.user.id; // Get from JWT token
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    // Check if currently checked in
+    const currentSessionStart = await getCurrentSessionStart(userId);
+    const isCheckedIn = currentSessionStart !== null;
+
+    // Calculate today's total runtime
+    const todayRuntime = await calculateTodayRuntime(userId);
+
+    // Calculate current session time if checked in
+    let currentSessionMinutes = 0;
+    if (isCheckedIn) {
+      currentSessionMinutes = Math.floor((new Date() - new Date(currentSessionStart)) / (1000 * 60));
+    }
+
+    // Calculate total runtime including current session
+    const totalRuntimeWithCurrentSession = todayRuntime + currentSessionMinutes;
+
+    res.status(200).json({ 
+      success: true, 
+      data: {
+        isCheckedIn: isCheckedIn,
+        currentSessionStart: currentSessionStart,
+        currentSessionMinutes: currentSessionMinutes,
+        todayCompletedRuntime: todayRuntime, // Only completed sessions
+        todayTotalRuntime: totalRuntimeWithCurrentSession, // Including current session
+        todayRuntimeFormatted: `${Math.floor(totalRuntimeWithCurrentSession / 60)}h ${totalRuntimeWithCurrentSession % 60}m`,
+        date: new Date().toISOString().split('T')[0]
+      }
+    });
+
+  } catch (error) {
+    console.error("Status error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+//History - Get historical records with daily summaries
+exports.history = async (req, res) => {
+  try {
+    const userId = req.user.id; // Get from JWT token
+    const { limit = 30, offset = 0, startDate, endDate } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    // Build where clause
+    let whereClause = { userId: userId };
+    
+    if (startDate || endDate) {
+      whereClause.timestamp = {};
+      if (startDate) {
+        whereClause.timestamp.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        whereClause.timestamp.lte = endDateTime;
+      }
+    }
+
+    // Get all records
+    const records = await prisma.checkInOut.findMany({
+      where: whereClause,
+      orderBy: { timestamp: "desc" },
+      take: parseInt(limit),
+      skip: parseInt(offset)
+    });
+
+    // Group records by date and calculate daily totals
+    const dailySummary = {};
+    
+    records.forEach(record => {
+      const date = record.timestamp.toISOString().split('T')[0];
+      
+      if (!dailySummary[date]) {
+        dailySummary[date] = {
+          date: date,
+          totalMinutes: 0,
+          sessions: [],
+          checkins: [],
+          checkouts: []
+        };
+      }
+      
+      if (record.checkType === 1) {
+        dailySummary[date].checkins.push(record);
+      } else if (record.checkType === 2) {
+        dailySummary[date].checkouts.push(record);
+        dailySummary[date].totalMinutes += record.difference || 0;
+      }
+      
+      dailySummary[date].sessions.push(record);
+    });
+
+    // Format daily summaries
+    const formattedDailySummary = Object.values(dailySummary).map(day => ({
+      ...day,
+      totalHours: Math.floor(day.totalMinutes / 60),
+      remainingMinutes: day.totalMinutes % 60,
+      formattedTime: `${Math.floor(day.totalMinutes / 60)}h ${day.totalMinutes % 60}m`,
+      sessionCount: Math.floor(day.sessions.length / 2) // Each session has checkin + checkout
+    }));
+
+    // Get total count for pagination
+    const totalRecords = await prisma.checkInOut.count({
+      where: whereClause
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      message: "History fetched successfully", 
+      data: {
+        records: records,
+        dailySummary: formattedDailySummary,
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          total: totalRecords,
+          hasMore: (parseInt(offset) + parseInt(limit)) < totalRecords
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("History error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Get Today's Sessions - Detailed view of today's check-ins and check-outs
+exports.todaySessions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    const { startOfDay, endOfDay } = getDayBounds();
+
+    const todayRecords = await prisma.checkInOut.findMany({
+      where: {
+        userId: userId,
+        timestamp: {
+          gte: startOfDay,
+          lte: endOfDay
+        }
+      },
+      orderBy: { timestamp: 'asc' }
+    });
+
+    // Group into sessions (checkin-checkout pairs)
+    const sessions = [];
+    let currentSession = null;
+
+    todayRecords.forEach(record => {
+      if (record.checkType === 1) { // Check-in
+        if (currentSession) {
+          // Previous session wasn't closed properly, close it
+          sessions.push(currentSession);
+        }
+        currentSession = {
+          checkin: record,
+          checkout: null,
+          duration: 0
+        };
+      } else if (record.checkType === 2 && currentSession) { // Check-out
+        currentSession.checkout = record;
+        currentSession.duration = record.difference || 0;
+        sessions.push(currentSession);
+        currentSession = null;
+      }
+    });
+
+    // If there's an active session, add it
+    if (currentSession) {
+      const now = new Date();
+      currentSession.duration = Math.floor((now - new Date(currentSession.checkin.timestamp)) / (1000 * 60));
+      currentSession.isActive = true;
+      sessions.push(currentSession);
+    }
+
+    const totalMinutes = sessions.reduce((total, session) => total + session.duration, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        date: new Date().toISOString().split('T')[0],
+        sessions: sessions,
+        totalMinutes: totalMinutes,
+        totalFormatted: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+        sessionCount: sessions.length,
+        isCurrentlyCheckedIn: currentSession !== null
+      }
+    });
+
+  } catch (error) {
+    console.error("Today's sessions error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+
+
+
 

@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,17 +16,32 @@ model Role {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String?   // nullable
-  email        String   @unique
+  id            Int           @id @default(autoincrement())
+  name          String?       // nullable
+  email         String        @unique
   password_hash String
-  role_id      Int?
-  is_active    Boolean  @default(true)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  role_id       Int?
+  is_active     Boolean       @default(true)
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @updatedAt
 
-  role Role? @relation(fields: [role_id], references: [id])
+  role          Role?         @relation(fields: [role_id], references: [id])
+  checkinouts   CheckInOut[]  @relation("UserCheckInOuts")
 }
+
+model CheckInOut {
+  id          Int       @id @default(autoincrement())
+  userId      Int?      // Made nullable to allow migration
+  timestamp   DateTime? // Made nullable to allow migration
+  checkType   Int?      // Made nullable to allow migration (1 for check-in, 2 for check-out)
+  difference  Int?      // difference in minutes between check-in and check-out
+
+  User        User?     @relation("UserCheckInOuts", fields: [userId], references: [id])
+
+  @@index([userId, timestamp])
+  @@map("checkinouts")
+}
+
 
 model Otp {
   id        Int      @id @default(autoincrement())

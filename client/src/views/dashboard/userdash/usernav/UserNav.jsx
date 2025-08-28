@@ -14,7 +14,7 @@ const UserNav = () => {
     <AppBar position="static" color="primary">
       <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
         <Typography variant="h6" component="div">
-          Admin Dashboard
+          User Dashboard
         </Typography>
         <Box>
           <Button color="inherit" onClick={handleLogout}>

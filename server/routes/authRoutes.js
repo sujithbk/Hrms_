@@ -147,10 +147,70 @@
 // module.exports = router;
 
 
+// const express = require('express');
+
+// const {  authMiddleware,
+//   authenticateToken,} = require('../middlewares/authMiddleware')
+
+
+// const { register, otpVerification , generatingOtp,login, forgotpassword, getAllUsers ,veryNewPasswordOtp, 
+//     loginOtp,logout ,status,checkIn,checkOut,history} = require('../controllers/authControllers');
+
+// const router = express.Router();
+
+// // Debug middleware to log all requests
+// router.use((req, res, next) => {
+//     console.log(`Auth Route: ${req.method} ${req.path}`);
+//     console.log('Request body:', req.body);
+//     next();
+// });
+// router.use((req, res, next) => {
+//     console.log(`Auth Route: ${req.method} ${req.path}`);
+//     console.log('Request headers:', req.headers);
+//     console.log('Request body:', req.body);
+//     next();
+// });
+// router.post('/register', register);
+// router.post('/otp-verification', otpVerification);
+// router.post('/generate-otp', generatingOtp)
+// router.post('/login',login)
+// router.post('/forgotpassword', forgotpassword)
+// router.post('/otpforgot' , veryNewPasswordOtp)
+// router.post('/otplogin',loginOtp)
+// router.post('/logout',logout)
+// router.get("/admin/users", authMiddleware, getAllUsers);
+// router.post("/checkin", authenticateToken, checkIn);
+// router.post("/checkout", authenticateToken, checkOut);
+// router.get("/status", authenticateToken, status);
+// router.get("/history", authenticateToken, history);
+
+// module.exports = router;
+
+
 const express = require('express');
-const authMiddleware = require('../middlewares/authMiddleware')
-const { register, otpVerification , generatingOtp,login, forgotpassword, getAllUsers ,veryNewPasswordOtp, 
-    loginOtp,logout} = require('../controllers/authControllers');
+
+const {
+ authMiddleware,
+  authCheckMiddleware
+} = require('../middlewares/authMiddleware');
+
+const { 
+  register, 
+  otpVerification, 
+  generatingOtp, 
+  login, 
+  forgotpassword, 
+  getAllUsers, 
+  roleCreation ,
+  veryNewPasswordOtp,      
+  loginOtp, 
+  logout,
+  
+  checkin,    
+  checkout,   
+  status, 
+ 
+} = require('../controllers/authControllers');
 
 const router = express.Router();
 
@@ -160,20 +220,32 @@ router.use((req, res, next) => {
     console.log('Request body:', req.body);
     next();
 });
+
 router.use((req, res, next) => {
     console.log(`Auth Route: ${req.method} ${req.path}`);
     console.log('Request headers:', req.headers);
     console.log('Request body:', req.body);
     next();
 });
+
+// Auth routes
 router.post('/register', register);
 router.post('/otp-verification', otpVerification);
-router.post('/generate-otp', generatingOtp)
-router.post('/login',login)
-router.post('/forgotpassword', forgotpassword)
-router.post('/otpforgot' , veryNewPasswordOtp)
-router.post('/otplogin',loginOtp)
-router.post('/logout',logout)
+router.post('/generate-otp', generatingOtp);
+router.post('/login', login);
+router.post('/forgotpassword', forgotpassword);
+router.post('/otpforgot', veryNewPasswordOtp);
+router.post('/otplogin', loginOtp);
+router.post('/logout', logout);
+
+// Admin routes
 router.get("/admin/users", authMiddleware, getAllUsers);
+router.post("/admin/roleCreation",authMiddleware,roleCreation )
+
+// Attendance routes - use correct function names
+
+router.post("/checkin", authCheckMiddleware, checkin);
+router.post("/checkout", authCheckMiddleware, checkout);
+router.get("/status", authCheckMiddleware, status);
 
 module.exports = router;

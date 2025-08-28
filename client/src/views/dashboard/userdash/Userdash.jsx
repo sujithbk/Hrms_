@@ -1,12 +1,17 @@
-import React from 'react'
-import UserNav from './usernav/UserNav'
+import React from 'react';
+import { Box } from '@mui/material';
+import UserNav from './usernav/UserNav';
+import Attendance from './userbody/Atendance'; // Fixed import name
 
-function Userdash() {
+function UserDash() {
   return (
-    <>
-    <UserNav/>
-    </>
-  )
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <UserNav />
+      <Box sx={{ pt: 2 }}>
+        <Attendance />
+      </Box>
+    </Box>
+  );
 }
 
-export default Userdash
+export default UserDash;
