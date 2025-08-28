@@ -348,77 +348,6 @@ exports.login = async (req, res) => {
 };
 
 
-// exports.loginOtp = async (req, res) => {
-//   try {
-//     const { otp } = req.body;
-
-//     if (!otp) {
-//       return res.status(400).json({ success: false, message: "OTP is required" });
-//     }
-
-//     if (!req.session.pendingUser || !req.session.pendingUser.email) {
-//       return res.status(400).json({ success: false, message: "Session expired. Please login again." });
-//     }
-
-//     const email = req.session.pendingUser.email;
-
-//     // Find OTP record by email and otp that has not expired
-//     const otpRecord = await prisma.otp.findFirst({
-//       where: {
-//         email,
-//         otp,
-//         expiresAt: { gt: new Date() }
-//       }
-//     });
-
-//     if (!otpRecord) {
-//       return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
-//     }
-
-//     // Fetch user details
-//     const user = await prisma.user.findUnique({
-//       where: { email },
-//       include: { role: true }
-//     });
-
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: "User not found" });
-//     }
-
-//     // Generate JWT token
-//     const token = JWT.sign(
-//       {
-//         userId: user.id,
-//         email: user.email,
-//         role: user.role?.role_name
-//       },
-//       process.env.JWT_TOKEN,
-//       { expiresIn: '1h' }
-//     );
-
-//     // Cleanup: delete OTP record(s) for this email after successful login
-//     await prisma.otp.deleteMany({ where: { email } });
-
-//     // Clear pendingUser from session to mark login completion
-//     delete req.session.pendingUser;
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Login successful.",
-//       user: {
-//         id: user.id,
-//         name: user.name,
-//         email: user.email,
-//         role: user.role?.role_name
-//       },
-//       token
-//     });
-
-//   } catch (error) {
-//     console.error('Login OTP verification error:', error);
-//     res.status(500).json({ success: false, message: "OTP verification error occurred." });
-//   }
-// };
 
 exports.loginOtp = async (req, res) => {
   try {
@@ -745,6 +674,35 @@ exports.roleCreation = async(req,res)=>{
       success:false
     })
   }
+}
+
+exports.getRole = async(req,res) =>{
+ try {
+  
+
+  const {user} = req.body
+
+  if(!user){
+    res.status(401).json({
+      message:"User is not defiend",
+      success:false
+    })
+  }
+ 
+  const getRoles = await prisma.role.findMany({
+    select:{
+      role_name : true,
+      description : true
+    }
+  })
+  console.log(``);
+  
+  return
+
+
+ } catch (error) {
+  
+ }
 }
 
 
