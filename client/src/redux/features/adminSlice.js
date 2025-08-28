@@ -49,26 +49,7 @@ export const fetchUsers = createAsyncThunk(
   }
 );
 
- export const roleCreation = createAsyncThunk("admin/roleCreation" , async (_, {rejectWithValue}) =>{
-   try {
-     const token = localStorage.getItem("token")
-       if (!token) {
-        return rejectWithValue("No authentication token found");
-      }
-       console.log("Making request with token:", token); // Debug log
 
-       const response = await axios.post("http://localhost:5000/api/auth/admin/roleCreation",{
-        headers:{
-         Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        }
-       })
-        console.log("Response received:", response.data); // Debug log
-
-   } catch (error) {
-    
-   }
- })
 
 const adminSlice = createSlice({
   name: "admin",
